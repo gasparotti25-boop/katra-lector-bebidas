@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#090611"><title>KATRA · Lector de Bebidas</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
-:root{color-scheme:dark;--gold:#d8b86b;--purple:#8b5cf6;--bg:#090611}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -10%,#35204f 0%,#160d25 42%,var(--bg) 78%);color:#fff;font-family:Arial,sans-serif;display:flex;justify-content:center;padding:24px 16px 40px}.wrap{width:min(100%,480px)}header{text-align:center;margin:12px 0 26px}.logo{font-weight:1000;letter-spacing:.28em;font-size:42px;text-shadow:0 0 22px #a855f788}.sub{color:var(--gold);letter-spacing:.25em;font-size:11px;margin-top:8px}.panel{background:#ffffff0b;border:1px solid #ffffff20;border-radius:22px;padding:18px;box-shadow:0 18px 55px #0008;backdrop-filter:blur(12px)}.hint{text-align:center;color:#c9bfd5;font-size:14px;line-height:1.5;margin:0 0 16px}#reader{width:100%;overflow:hidden;border-radius:16px;background:#100b18}#reader video{border-radius:16px}#reader__dashboard_section_csr button,.btn{border:1px solid #a78bfa;background:#2b1742;color:white;padding:12px 16px;border-radius:12px;font-weight:700}.btn{width:100%;margin-top:12px;font-size:15px;cursor:pointer}.status{margin-top:16px;border-radius:16px;padding:18px;text-align:center;background:#ffffff0b;border:1px solid #ffffff18;min-height:94px}.status strong{display:block;font-size:21px;margin-bottom:7px}.status span{color:#d8d0e2;font-size:14px;overflow-wrap:anywhere}.ok{border-color:#22c55e88;background:#052d1caa}.ok strong{color:#4ade80}.bad{border-color:#ef444488;background:#390d18aa}.bad strong{color:#f87171}.wait strong{color:var(--gold)}.foot{text-align:center;color:#8e829c;font-size:11px;margin-top:18px}.manual{display:flex;gap:8px;margin-top:14px}.manual input{min-width:0;flex:1;border:1px solid #ffffff30;border-radius:11px;background:#100b18;color:white;padding:12px}.manual button{border:0;border-radius:11px;background:var(--gold);color:#170f08;font-weight:800;padding:0 15px}
+:root{color-scheme:dark;--gold:#d8b86b;--purple:#8b5cf6;--bg:#090611}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -10%,#35204f 0%,#160d25 42%,var(--bg) 78%);color:#fff;font-family:Arial,sans-serif;display:flex;justify-content:center;padding:24px 16px 40px}.wrap{width:min(100%,480px)}header{text-align:center;margin:12px 0 26px}.logo{font-weight:1000;letter-spacing:.28em;font-size:42px;text-shadow:0 0 22px #a855f788}.sub{color:var(--gold);letter-spacing:.25em;font-size:11px;margin-top:8px}.panel{background:#ffffff0b;border:1px solid #ffffff20;border-radius:22px;padding:18px;box-shadow:0 18px 55px #0008;backdrop-filter:blur(12px)}.hint{text-align:center;color:#c9bfd5;font-size:14px;line-height:1.5;margin:0 0 16px}#reader{width:100%;overflow:hidden;border-radius:16px;background:#100b18}#reader video{border-radius:16px}#reader__dashboard_section_csr button,.btn{border:1px solid #a78bfa;background:#2b1742;color:white;padding:12px 16px;border-radius:12px;font-weight:700}.btn{width:100%;margin-top:12px;font-size:15px;cursor:pointer}.status{margin-top:16px;border-radius:16px;padding:18px;text-align:center;background:#ffffff0b;border:1px solid #ffffff18;min-height:94px}.status strong{display:block;font-size:21px;margin-bottom:7px}.status span{color:#d8d0e2;font-size:14px;overflow-wrap:anywhere}.ok{border-color:#22c55e88;background:#052d1caa}.ok strong{color:#4ade80}.bad{border-color:#ef444488;background:#390d18aa}.bad strong{color:#f87171}.wait strong{color:var(--gold)}.foot{text-align:center;color:#8e829c;font-size:11px;margin-top:18px}.manual{display:flex;gap:8px;margin-top:14px}.manual input{min-width:0;flex:1;border:1px solid #ffffff30;border-radius:11px;background:#100b18;color:white;padding:12px}#reader.paused{display:none!important}.manual button{border:0;border-radius:11px;background:var(--gold);color:#170f08;font-weight:800;padding:0 15px}
 </style></head>
 <body><main class="wrap"><header><div class="logo">KATRA</div><div class="sub">S I E 7 E · CONTROL DE BEBIDAS</div></header>
 <section class="panel"><p class="hint">Escaneá el QR del cliente. Cada código habilita una sola bebida y se valida de manera independiente.</p><div id="reader"></div>
@@ -16,14 +16,150 @@
 const API_URL='https://script.google.com/macros/s/AKfycbzRhIKFzYn34gVg8v8jUfvP23oQsfXG7BOgqcOXyVyDdBcxH-zEiY0CkL8--YwbqjPj/exec';
 const statusBox=document.getElementById('status');
 const restartBtn=document.getElementById('restartBtn');
-let scanner=null, scannerRunning=false, busy=false, scanPaused=false;
-function show(kind,title,detail){statusBox.className='status '+kind;statusBox.innerHTML='<strong></strong><span></span>';statusBox.querySelector('strong').textContent=title;statusBox.querySelector('span').textContent=detail||'';}
-async function stopScanner(){if(!scanner)return;try{if(scannerRunning){await scanner.stop();scannerRunning=false;}}catch(e){}try{scanner.clear();}catch(e){}scanner=null;}
-async function validate(code){code=String(code||'').trim();if(!code||busy)return;if(API_URL.includes('PEGAR_URL')){show('bad','FALTA CONFIGURAR','Completá la URL de Apps Script en index.html.');return;}busy=true;show('wait','VALIDANDO…','Consultando el registro de Bebidas.');const cb='katraCb_'+Date.now()+'_'+Math.floor(Math.random()*1e6);const script=document.createElement('script');const timer=setTimeout(()=>{cleanup();busy=false;show('bad','SIN RESPUESTA','Revisá la conexión e intentá nuevamente. Tocá VOLVER A ESCANEAR para leer otro QR.');restartBtn.disabled=false;},12000);function cleanup(){clearTimeout(timer);script.remove();try{delete window[cb]}catch(e){window[cb]=undefined}}window[cb]=r=>{cleanup();busy=false;if(r&&r.ok){show('ok','QR VÁLIDO · ENTREGAR TICKET',(r.producto||'Bebida')+' · '+(r.comprador||'')+' · '+(r.mensaje||'Código aceptado.'));}else{show('bad',r&&r.estado==='USADA'?'QR YA UTILIZADO':'QR NO VÁLIDO',r&&r.mensaje?r.mensaje:'No se pudo validar el código.');}restartBtn.textContent='VOLVER A ESCANEAR';restartBtn.disabled=false;};script.onerror=()=>{cleanup();busy=false;show('bad','ERROR DE CONEXIÓN','No se pudo contactar Google Sheets. Tocá VOLVER A ESCANEAR para intentar de nuevo.');restartBtn.disabled=false;};script.src=API_URL+'?accion=validarBebidaQR&codigo='+encodeURIComponent(code)+'&callback='+encodeURIComponent(cb)+'&_='+Date.now();document.body.appendChild(script);}
-async function onScan(text){if(scanPaused||busy)return;scanPaused=true;restartBtn.disabled=true;show('wait','QR DETECTADO','Deteniendo la cámara y verificando el código…');await stopScanner();await validate(text);}
-async function startScanner(){if(busy)return;if(!window.Html5Qrcode){show('bad','NO CARGÓ EL LECTOR','Revisá la conexión a internet y recargá.');return;}scanPaused=false;restartBtn.disabled=true;restartBtn.textContent='PREPARANDO CÁMARA…';try{scanner=new Html5Qrcode('reader');await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:240,height:240}},onScan);scannerRunning=true;restartBtn.textContent='VOLVER A ESCANEAR';restartBtn.disabled=false;show('wait','LECTOR LISTO','Apuntá la cámara al próximo código QR.');}catch(e){scanner=null;scannerRunning=false;show('bad','NO SE PUDO ABRIR LA CÁMARA','Permití el acceso a la cámara desde el navegador.');restartBtn.textContent='REINTENTAR CÁMARA';restartBtn.disabled=false;}}
-document.getElementById('manualBtn').onclick=async()=>{if(busy)return;scanPaused=true;restartBtn.disabled=true;await stopScanner();await validate(document.getElementById('manualCode').value);};
-document.getElementById('manualCode').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('manualBtn').click();});
-restartBtn.onclick=async()=>{if(busy)return;document.getElementById('manualCode').value='';await stopScanner();show('wait','LECTOR LISTO','Preparando la cámara para el próximo QR…');await startScanner();};
+const readerBox=document.getElementById('reader');
+let scanner=null, scannerRunning=false, busy=false, scanPaused=false, scanAccepted=false;
+
+function show(kind,title,detail){
+  statusBox.className='status '+kind;
+  statusBox.innerHTML='<strong></strong><span></span>';
+  statusBox.querySelector('strong').textContent=title;
+  statusBox.querySelector('span').textContent=detail||'';
+}
+
+async function stopScanner(){
+  const current=scanner;
+  scanner=null;
+  if(current){
+    try{ await current.stop(); }catch(e){}
+    try{ current.clear(); }catch(e){}
+  }
+  scannerRunning=false;
+  // Safety net: stop every media track and remove the live preview.
+  readerBox.querySelectorAll('video').forEach(v=>{
+    try{ if(v.srcObject) v.srcObject.getTracks().forEach(t=>t.stop()); }catch(e){}
+    try{ v.pause(); v.srcObject=null; }catch(e){}
+  });
+  readerBox.innerHTML='';
+  readerBox.classList.add('paused');
+}
+
+async function validate(code){
+  code=String(code||'').trim();
+  if(!code||busy)return;
+  if(API_URL.includes('PEGAR_URL')){
+    busy=false;
+    show('bad','FALTA CONFIGURAR','Completá la URL de Apps Script.');
+    restartBtn.disabled=false;
+    return;
+  }
+  busy=true;
+  show('wait','VALIDANDO…','Un momento, estamos verificando este QR.');
+  const cb='katraCb_'+Date.now()+'_'+Math.floor(Math.random()*1e6);
+  const script=document.createElement('script');
+  let finished=false;
+  const timer=setTimeout(()=>{
+    if(finished)return;
+    finished=true; cleanup(); busy=false;
+    show('bad','SIN RESPUESTA','No llegó respuesta de Google Sheets. Revisá la conexión.');
+    restartBtn.textContent='ESCANEAR OTRO QR';
+    restartBtn.disabled=false;
+  },12000);
+  function cleanup(){
+    clearTimeout(timer); script.remove();
+    try{delete window[cb]}catch(e){window[cb]=undefined}
+  }
+  window[cb]=r=>{
+    if(finished)return;
+    finished=true; cleanup(); busy=false;
+    if(r&&r.ok){
+      show('ok','QR VÁLIDO · ENTREGAR TICKET',
+        (r.producto||'Bebida')+' · '+(r.comprador||'')+' · '+(r.mensaje||'Código aceptado.'));
+    }else{
+      show('bad',r&&r.estado==='USADA'?'QR YA UTILIZADO':'QR NO VÁLIDO',
+        r&&r.mensaje?r.mensaje:'No se pudo validar el código.');
+    }
+    restartBtn.textContent='ESCANEAR OTRO QR';
+    restartBtn.disabled=false;
+  };
+  script.onerror=()=>{
+    if(finished)return;
+    finished=true; cleanup(); busy=false;
+    show('bad','ERROR DE CONEXIÓN','No se pudo contactar Google Sheets.');
+    restartBtn.textContent='ESCANEAR OTRO QR';
+    restartBtn.disabled=false;
+  };
+  script.src=API_URL+'?accion=validarBebidaQR&codigo='+encodeURIComponent(code)+
+    '&callback='+encodeURIComponent(cb)+'&_='+Date.now();
+  document.body.appendChild(script);
+}
+
+async function onScan(text){
+  // Lock synchronously: duplicate camera callbacks cannot validate this QR twice.
+  if(scanPaused||busy||scanAccepted)return;
+  scanPaused=true;
+  scanAccepted=true;
+  restartBtn.disabled=true;
+  restartBtn.textContent='QR CAPTURADO';
+  show('wait','QR DETECTADO','Cámara detenida. Verificando una sola vez…');
+  await stopScanner();
+  await validate(text);
+}
+
+async function startScanner(){
+  if(busy)return;
+  scanPaused=false;
+  scanAccepted=false;
+  readerBox.classList.remove('paused');
+  readerBox.innerHTML='';
+  restartBtn.disabled=true;
+  restartBtn.textContent='ABRIENDO CÁMARA…';
+  if(!window.Html5Qrcode){
+    show('bad','NO CARGÓ EL LECTOR','Revisá internet y recargá la página.');
+    restartBtn.textContent='REINTENTAR CÁMARA';
+    restartBtn.disabled=false;
+    return;
+  }
+  const instance=new Html5Qrcode('reader');
+  scanner=instance;
+  // Set running before awaiting start: the first QR can arrive immediately.
+  scannerRunning=true;
+  try{
+    await instance.start(
+      {facingMode:'environment'},
+      {fps:10,qrbox:{width:240,height:240}},
+      onScan
+    );
+    // If a QR arrived while start() was resolving, do not re-enable anything.
+    if(scanPaused||scanner!==instance)return;
+    show('wait','LECTOR LISTO','Apuntá al QR. Se leerá uno solo y la cámara se detendrá.');
+    restartBtn.textContent='ESCANEAR OTRO QR';
+    restartBtn.disabled=false;
+  }catch(e){
+    if(scanner===instance)scanner=null;
+    scannerRunning=false;
+    show('bad','NO SE PUDO ABRIR LA CÁMARA','Permití el acceso a la cámara desde el navegador.');
+    restartBtn.textContent='REINTENTAR CÁMARA';
+    restartBtn.disabled=false;
+  }
+}
+
+document.getElementById('manualBtn').onclick=async()=>{
+  if(busy)return;
+  scanPaused=true; scanAccepted=true;
+  restartBtn.disabled=true;
+  await stopScanner();
+  await validate(document.getElementById('manualCode').value);
+};
+document.getElementById('manualCode').addEventListener('keydown',e=>{
+  if(e.key==='Enter')document.getElementById('manualBtn').click();
+});
+restartBtn.onclick=async()=>{
+  if(busy)return;
+  document.getElementById('manualCode').value='';
+  restartBtn.disabled=true;
+  await stopScanner();
+  show('wait','NUEVO ESCANEO','Activando la cámara para otro QR…');
+  await startScanner();
+};
 startScanner();
 </script></body></html>
